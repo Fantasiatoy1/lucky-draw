@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Draw Wheel</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%);
+        }
+        #wheel-container {
+            position: relative;
+            width: 380px;
+            height: 380px;
+            margin-bottom: 32px;
+        }
+        #wheel {
+            width: 380px;
+            height: 380px;
+            border-radius: 50%;
+            border: 10px solid #fff;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+            background: #fff;
+        }
+        #startBtn {
+            padding: 14px 44px;
+            font-size: 1.25em;
+            background: linear-gradient(90deg, #6a82fb 0%, #fc5c7d 100%);
+            color: #fff;
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: bold;
+            letter-spacing: 2px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: background 0.2s, transform 0.2s;
+            margin-bottom: 16px;
+        }
+        #startBtn:active {
+            background: linear-gradient(90deg, #fc5c7d 0%, #6a82fb 100%);
+            transform: scale(0.97);
+        }
+        #result {
+            margin-top: 12px;
+            font-size: 1.35em;
+            color: #2d3436;
+            min-height: 2em;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        }
+    </style>
+</head>
+<body>
+    <div id="wheel-container">
+        <canvas id="wheel" width="380" height="380"></canvas>
+    </div>
+    <button id="startBtn">Start</button>
+    <div id="result"></div>
+
+    <script>
+        // 奖项及概率
+        const prizes = [
+            { name: 'Dream Queen\nSleep Mask', prob: 0.02, color: 'linear-gradient(135deg, #f8ffae 0%, #43c6ac 100%)', fontColor: '#2d3436' },
+            { name: 'Seduction\nMask', prob: 0.18, color: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)', fontColor: '#2d3436' },
+            { name: 'Aroma\nScent Pad', prob: 0.35, color: 'linear-gradient(135deg, #c2e9fb 0%, #81a4fd 100%)', fontColor: '#2d3436' },
+            { name: 'Rebel Girl\nStickers', prob: 0.45, color: 'linear-gradient(135deg, #fcb69f 0%, #ffdde1 100%)', fontColor: '#2d3436' }
+        ];
+        // 均匀分布角度
+        const sectorCount = prizes.length;
+        const sectorAngle = 2 * Math.PI / sectorCount;
+
+        // 绘制转盘（整体随angle旋转）+ 圆心指针
+        function drawWheel(angle = 0) {
+            const canvas = document.getElementById('wheel');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = centerX - 12;
+
+            // 整体旋转转盘
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(angle);
+            ctx.translate(-centerX, -centerY);
+
+            let startAngle = 0;
+            for (let i = 0; i < sectorCount; i++) {
+                let endAngle = startAngle + sectorAngle;
+                // 扇面渐变色
+                let grad = ctx.createLinearGradient(centerX, centerY, centerX + Math.cos(startAngle) * radius, centerY + Math.sin(startAngle) * radius);
+                let colorStops = prizes[i].color.match(/#([0-9a-fA-F]{6})/g);
+                if (colorStops && colorStops.length >= 2) {
+                    grad.addColorStop(0, colorStops[0]);
+                    grad.addColorStop(1, colorStops[1]);
+                } else {
+                    grad.addColorStop(0, '#fff');
+                    grad.addColorStop(1, '#eee');
+                }
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle, false);
+                ctx.closePath();
+                ctx.fillStyle = grad;
+                ctx.shadowColor = 'rgba(0,0,0,0.04)';
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                // 扇面边界线
+                ctx.save();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle, false);
+                ctx.stroke();
+                ctx.restore();
+                // 奖项文字（随扇区旋转）
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(startAngle + sectorAngle / 2);
+                ctx.textAlign = 'right';
+                let lines = prizes[i].name.split('\n');
+                let baseFontSize = 20;
+                if (lines.length > 1) baseFontSize = 16;
+                ctx.font = `bold ${baseFontSize}px 'Segoe UI', Arial`;
+                ctx.fillStyle = prizes[i].fontColor;
+                ctx.shadowColor = 'rgba(0,0,0,0.08)';
+                ctx.shadowBlur = 2;
+                let y = 10 - (lines.length - 1) * baseFontSize / 2;
+                for (let l = 0; l < lines.length; l++) {
+                    ctx.fillText(lines[l], radius - 18, y + l * baseFontSize);
+                }
+                ctx.restore();
+                startAngle = endAngle;
+            }
+            ctx.restore(); // 恢复到未旋转状态
+
+            // 绘制圆心指针（指向12点方向）
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(0); // 始终指向12点
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-16, -radius + 36);
+            ctx.lineTo(0, -radius + 8);
+            ctx.lineTo(16, -radius + 36);
+            ctx.closePath();
+            ctx.fillStyle = '#e74c3c';
+            ctx.shadowColor = 'rgba(0,0,0,0.18)';
+            ctx.shadowBlur = 4;
+            ctx.fill();
+            ctx.restore();
+        }
+        drawWheel();
+
+        // 随机抽奖（概率不变）
+        function getRandomPrizeIdx() {
+            const r = Math.random();
+            let acc = 0;
+            for (let i = 0; i < prizes.length; i++) {
+                acc += prizes[i].prob;
+                if (r < acc) return i;
+            }
+            return prizes.length - 1; // 防止浮点误差
+        }
+
+        // 动画相关
+        let spinning = false;
+        document.getElementById('startBtn').onclick = function() {
+            if (spinning) return;
+            spinning = true;
+            document.getElementById('result').textContent = '';
+            // 随机结果
+            const prizeIdx = getRandomPrizeIdx();
+            // 均匀分布的目标角度
+            const minAngle = prizeIdx * sectorAngle;
+            const maxAngle = (prizeIdx + 1) * sectorAngle;
+            // 随机落点在该奖项扇区
+            const targetAngle = Math.random() * (maxAngle - minAngle) + minAngle;
+            // 转盘初始角度
+            let current = 0;
+            // 旋转总圈数+目标角度
+            const rounds = 5;
+            // 让中奖区域正对12点方向（即指向箭头）
+            const finalAngle = 2 * Math.PI * rounds + (2 * Math.PI - targetAngle) - Math.PI / 2;
+            const duration = 3000;
+            const startTime = performance.now();
+            function animate(now) {
+                const elapsed = now - startTime;
+                let progress = Math.min(elapsed / duration, 1);
+                // ease out
+                progress = 1 - Math.pow(1 - progress, 3);
+                const angle = finalAngle * progress;
+                drawWheel(angle);
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    spinning = false;
+                    drawWheel(finalAngle); // 保证最终静止状态
+                    document.getElementById('result').textContent = `Congratulations! You won: ${prizes[prizeIdx].name.replace(/\n/g, ' ')}`;
+                }
+            }
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html> 
